@@ -1,0 +1,107 @@
+{
+  "project_name": "CENTLY - Fine Jewellery E-commerce",
+  "theme": "light",
+  "archetype": "Archetype 1 (Organic & Earthy) & Archetype 5 (Jewel & Luxury) Hybrid",
+  "design_philosophy": "Editorial fashion magazine meets refined craftsmanship. The design must evoke trust, permanence, and quiet confidence. Generous whitespace, distinctive typography, and high-quality photography are the primary visual drivers. Avoid generic 'SaaS-like' components—everything must feel tactile, deliberate, and high-end. No heavy drop shadows; rely on crisp 1px borders and organic background shifts.",
+  "colors": {
+    "background_primary": "#FAF9F5",
+    "background_secondary": "#F3F1EC",
+    "background_tertiary": "#EAE5DC",
+    "text_primary": "#1A1918",
+    "text_secondary": "#5E5950",
+    "accent_primary": "#B89758",
+    "accent_secondary": "#D4B882",
+    "border_light": "#EAE5DC",
+    "border_dark": "#D1C9B8",
+    "error": "#964545",
+    "success": "#4A6E53",
+    "button_primary_bg": "#1A1918",
+    "button_primary_text": "#FFFFFF",
+    "button_primary_hover": "#363432"
+  },
+  "typography": {
+    "heading_font": "Cormorant Garamond, serif",
+    "body_font": "Outfit, sans-serif",
+    "rules": {
+      "h1": "text-5xl md:text-6xl lg:text-7xl font-light tracking-tighter leading-none",
+      "h2": "text-4xl md:text-5xl font-light tracking-tight leading-none",
+      "h3": "text-2xl md:text-3xl font-medium tracking-tight",
+      "body": "text-base font-light text-[#5E5950] leading-relaxed",
+      "overline": "text-xs font-medium uppercase tracking-[0.2em] text-[#B89758]",
+      "nav_link": "text-sm font-medium tracking-wide hover:text-[#B89758] transition-colors",
+      "button_text": "text-xs font-semibold uppercase tracking-[0.15em]"
+    },
+    "font_imports": [
+      "@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Outfit:wght@300;400;500;600&display=swap');"
+    ]
+  },
+  "spacing_and_layout": {
+    "section_padding": "py-24 md:py-32",
+    "container_padding": "px-6 md:px-12 max-w-[1600px] mx-auto",
+    "grid_gap": "gap-8 md:gap-12",
+    "border_radius": {
+      "none": "rounded-none",
+      "subtle": "rounded-[2px]",
+      "standard": "rounded-none"
+    },
+    "bento_grid_rules": "Use Mode A 'Tetris Grid' for Four Pillars and Editorial sections. Grid items must have internal padding of p-8 or p-12 if bordered. Avoid perfectly equal squares."
+  },
+  "components": {
+    "buttons": "Flat, sharp edges (rounded-none). Primary: bg-[#1A1918] text-white. Secondary: bg-transparent border border-[#1A1918] text-[#1A1918]. Hover effects: bg-[#363432] or subtle scale.",
+    "cards": "Cardless layout preferred. If container is needed, use bg-[#F3F1EC] with 0px radius. No drop shadows. Use 1px border-[#EAE5DC] if separation is required.",
+    "inputs": "Shadcn form inputs customized. border-b-2 border-transparent border-b-[#EAE5DC] bg-[#FAF9F5] rounded-none px-0 py-3 focus:border-b-[#1A1918] focus:ring-0 placeholder:text-[#A39D90].",
+    "header": "Sticky header, bg-[#FAF9F5]/90 backdrop-blur-xl border-b border-[#EAE5DC]. z-50. Minimal, centered logo.",
+    "ticker_bar": "Infinite marquee using React Fast Marquee. bg-[#1A1918] text-[#FAF9F5] py-2.5 text-xs font-medium uppercase tracking-[0.2em].",
+    "product_grid": "Grid-cols-2 md:grid-cols-3 lg:grid-cols-4. High-aspect ratio images (4:5 or 3:4). Clean typography below image (Title, Price, Material tags).",
+    "mega_menu": "Shadcn Navigation Menu heavily customized. Full-width dropdown with editorial image blocks and categorized text links.",
+    "drawer": "Shadcn Sheet for Cart and Wishlist. Right side slide-in. Elegant close button, generous padding.",
+    "accordion": "Shadcn Accordion for FAQs. 1px border-b-[#EAE5DC], no side borders. Large, elegant font for triggers."
+  },
+  "animations": {
+    "hover": "Subtle image scale up (transform scale-105 duration-700 ease-out) inside an overflow-hidden container.",
+    "entrance": "Fade-in-up staggered on scroll (framer-motion).",
+    "transitions": "Smooth and slow (duration-500)."
+  },
+  "icons": {
+    "library": "lucide-react",
+    "stroke_width": 1.5,
+    "style": "Minimalist, un-intrusive"
+  },
+  "media_assets": {
+    "hero": {
+      "url": "https://images.unsplash.com/photo-1589713680561-1d0b6945a582?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODd8MHwxfHNlYXJjaHwyfHx3b21hbiUyMHdlYXJpbmclMjBmaW5lJTIwbWluaW1hbCUyMGdvbGQlMjBkaWFtb25kJTIwamV3ZWxyeSUyMHBvcnRyYWl0fGVufDB8fHx8MTc3NzI2NTMxM3ww&ixlib=rb-4.1.0&q=85",
+      "description": "Woman wearing minimalist gold necklace in black spaghetti strap. Use for main landing hero to signify 'Everyday Wear'.",
+      "overlay_strategy": "bg-black/10 gradient from bottom"
+    },
+    "product_macro": {
+      "url": "https://images.pexels.com/photos/30541177/pexels-photo-30541177.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Close-up of luxury gold and diamond ring. Use in 'Four Pillars' section to highlight VVS clarity."
+    },
+    "product_lifestyle": {
+      "url": "https://images.unsplash.com/photo-1757033534539-0a0cead70908?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxNzV8MHwxfHNlYXJjaHw0fHxmaW5lJTIwZGlhbW9uZCUyMGdvbGQlMjByaW5nJTIwbmVja2xhY2UlMjBjbG9zZSUyMHVwfGVufDB8fHx8MTc3NzI2NTMxMnww&ixlib=rb-4.1.0&q=85",
+      "description": "Elegant gold diamond necklace layout. Use for collections/category preview."
+    },
+    "bridal_section": {
+      "url": "https://images.unsplash.com/photo-1613966561243-c6959a886009?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDJ8MHwxfHNlYXJjaHwxfHxlbGVnYW50JTIwYnJpZGUlMjB3ZWFyaW5nJTIwZ29sZCUyMGpld2VscnklMjBwb3J0cmFpdHxlbnwwfHx8fDE3NzcyNjUzMjR8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Elegant bride wearing gold jewelry. Use in Bridal consultation booking section."
+    },
+    "gifting_packaging": {
+      "url": "https://images.pexels.com/photos/30978810/pexels-photo-30978810.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Luxury jewelry box and packaging. Use for Gift Banner / Unboxing section."
+    }
+  },
+  "accessibility": {
+    "testing_attributes": "All interactive elements MUST have data-testid attributes (e.g. data-testid='cart-drawer-trigger').",
+    "contrast": "Ensure #5E5950 on #FAF9F5 meets minimum APCA/WCAG ratios. Focus states must use 1px solid #1A1918."
+  },
+  "instructions_to_main_agent": [
+    "Install 'react-fast-marquee' for the ticker bar.",
+    "Install 'framer-motion' for scroll and hover animations.",
+    "Implement Shadcn UI heavily but strip the default styling (remove default radii, drop shadows, and Vercel-like aesthetics). Override classes to match the pure, minimal editorial vibe.",
+    "Create a 'MegaMenu' using Shadcn Navigation Menu, ensuring it spans full width and looks like a high-end fashion catalog.",
+    "Ensure the layout relies on generous padding (py-24 to py-32) to separate distinct sections.",
+    "Do NOT use placeholder images. Use the provided image URLs strictly.",
+    "Do NOT use 'Inter' font. Use 'Cormorant Garamond' for headings and 'Outfit' for body/labels.",
+    "Use data-testid attributes universally for testing."
+  ]
+}
