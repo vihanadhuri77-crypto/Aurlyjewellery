@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Link, NavLink } from "react-router-dom";
-import { ShoppingBag, Heart, Menu, X } from "lucide-react";
+import { ShoppingBag, Heart, Menu, X, User } from "lucide-react";
 import { useStore } from "../context/StoreContext";
+import { useAuth } from "../context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 
 const collections = [
@@ -26,6 +27,7 @@ const allCollections = [
 
 export default function Header() {
   const { setCartOpen, setWishlistOpen, itemCount, wishlist } = useStore();
+  const { user } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -95,6 +97,17 @@ export default function Header() {
             <Link to="/journal" data-testid="nav-journal" className="hidden md:inline-block text-[11.5px] font-medium tracking-[0.2em] uppercase link-reveal">
               Journal
             </Link>
+            <Link
+              to={user && user.id ? "/account" : "/login"}
+              data-testid="nav-account"
+              className="relative"
+              aria-label="Account"
+            >
+              <User size={19} strokeWidth={1.5} />
+              {user && user.id && (
+                <span className="absolute -top-1.5 -right-2 w-2 h-2 rounded-full bg-[#B89758]" />
+              )}
+            </Link>
             <button data-testid="open-wishlist" onClick={() => setWishlistOpen(true)} className="relative" aria-label="Wishlist">
               <Heart size={19} strokeWidth={1.5} />
               {wishlist.length > 0 && (
@@ -136,6 +149,7 @@ export default function Header() {
                 </Link>
               ))}
               <Link onClick={() => setMobileOpen(false)} to="/journal" className="font-serif-display text-3xl py-3 border-b border-[#EAE5DC]">Journal</Link>
+              <Link onClick={() => setMobileOpen(false)} to={user && user.id ? "/account" : "/login"} className="font-serif-display text-3xl py-3 border-b border-[#EAE5DC]">{user && user.id ? "My Account" : "Sign In"}</Link>
               <Link onClick={() => setMobileOpen(false)} to="/about" className="font-serif-display text-3xl py-3 border-b border-[#EAE5DC]">About</Link>
               <Link onClick={() => setMobileOpen(false)} to="/contact" className="font-serif-display text-3xl py-3 border-b border-[#EAE5DC]">Contact</Link>
             </nav>

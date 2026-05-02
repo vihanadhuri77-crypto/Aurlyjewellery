@@ -66,28 +66,34 @@ export default function CartDrawer() {
                   )}
 
                   <ul className="space-y-6">
-                    {cart.map((item) => (
-                      <li key={item.id} data-testid={`cart-item-${item.slug}`} className="flex gap-4">
+                    {cart.map((item) => {
+                      const key = item.lineKey || item.id;
+                      return (
+                      <li key={key} data-testid={`cart-item-${item.slug}`} className="flex gap-4">
                         <div className="w-24 h-28 bg-[#F3F1EC] flex-shrink-0">
                           <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                         </div>
                         <div className="flex-1 flex flex-col">
                           <Link to={`/product/${item.slug}`} onClick={() => setCartOpen(false)} className="font-serif-display text-lg leading-tight">{item.name}</Link>
                           <p className="text-[11px] uppercase tracking-[0.18em] text-[#5E5950] mt-1">VVS · 9ct Gold</p>
+                          {item.engraving && (
+                            <p className="text-[11px] text-[#B89758] mt-1 font-serif-display italic">Engraving: "{item.engraving}"</p>
+                          )}
                           <div className="flex items-center justify-between mt-auto">
                             <div className="inline-flex items-center border border-[#EAE5DC]">
-                              <button data-testid={`qty-decr-${item.slug}`} onClick={() => updateQty(item.id, item.qty - 1)} className="px-2 py-1.5"><Minus size={12} strokeWidth={1.5}/></button>
+                              <button data-testid={`qty-decr-${item.slug}`} onClick={() => updateQty(key, item.qty - 1)} className="px-2 py-1.5"><Minus size={12} strokeWidth={1.5}/></button>
                               <span className="px-3 text-sm">{item.qty}</span>
-                              <button data-testid={`qty-incr-${item.slug}`} onClick={() => updateQty(item.id, item.qty + 1)} className="px-2 py-1.5"><Plus size={12} strokeWidth={1.5}/></button>
+                              <button data-testid={`qty-incr-${item.slug}`} onClick={() => updateQty(key, item.qty + 1)} className="px-2 py-1.5"><Plus size={12} strokeWidth={1.5}/></button>
                             </div>
                             <p className="text-sm">{formatINR(item.price * item.qty)}</p>
                           </div>
                         </div>
-                        <button data-testid={`cart-remove-${item.slug}`} onClick={() => removeFromCart(item.id)} className="text-[#5E5950] hover:text-[#1A1918] self-start">
+                        <button data-testid={`cart-remove-${item.slug}`} onClick={() => removeFromCart(key)} className="text-[#5E5950] hover:text-[#1A1918] self-start">
                           <Trash2 size={14} strokeWidth={1.5} />
                         </button>
                       </li>
-                    ))}
+                      );
+                    })}
                   </ul>
                 </div>
 

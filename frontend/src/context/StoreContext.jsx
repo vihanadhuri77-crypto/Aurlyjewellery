@@ -20,17 +20,22 @@ export function StoreProvider({ children }) {
   useEffect(() => localStorage.setItem("cently_cart", JSON.stringify(cart)), [cart]);
   useEffect(() => localStorage.setItem("cently_wishlist", JSON.stringify(wishlist)), [wishlist]);
 
-  const addToCart = (product, qty = 1) => {
+  const addToCart = (product, qty = 1, opts = {}) => {
+    const engraving = (opts.engraving || "").trim() || null;
     setCart((prev) => {
-      const existing = prev.find((p) => p.id === product.id);
-      if (existing) return prev.map((p) => (p.id === product.id ? { ...p, qty: p.qty + qty } : p));
-      return [...prev, { id: product.id, slug: product.slug, name: product.name, price: product.price, image: product.images[0], qty }];
+      const same = prev.find((p) => p.id === product.id && (p.engraving || null) === engraving);
+      if (same) return prev.map((p) => (p === same ? { ...p, qty: p.qty + qty } : p));
+      return [...prev, {
+        id: product.id, slug: product.slug, name: product.name, price: product.price,
+        image: product.images[0], qty, engraving,
+        lineKey: `${product.id}::${engraving || ""}`,
+      }];
     });
     setCartOpen(true);
   };
 
-  const removeFromCart = (id) => setCart((prev) => prev.filter((p) => p.id !== id));
-  const updateQty = (id, qty) => setCart((prev) => prev.map((p) => (p.id === id ? { ...p, qty: Math.max(1, qty) } : p)));
+  const removeFromCart = (lineKey) => setCart((prev) => prev.filter((p) => (p.lineKey || p.id) !== lineKey));
+  const updateQty = (lineKey, qty) => setCart((prev) => prev.map((p) => ((p.lineKey || p.id) === lineKey ? { ...p, qty: Math.max(1, qty) } : p)));
   const clearCart = () => setCart([]);
 
   const toggleWishlist = (product) => {

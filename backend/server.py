@@ -19,11 +19,17 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRY_HOURS = 12
+JWT_EXPIRY_HOURS = 24 * 7  # 7 days
+
+# Loyalty rules
+POINTS_PER_RUPEE = 0.01      # ₹100 spent → 1 point
+POINT_VALUE = 1              # 1 point = ₹1
+MAX_REDEEM_RATIO = 0.10      # max 10% of order can be paid in points
 
 app = FastAPI(title="Cently API")
 api_router = APIRouter(prefix="/api")
 admin_router = APIRouter(prefix="/api/admin")
+account_router = APIRouter(prefix="/api/account")
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -53,23 +59,42 @@ def create_access_token(user_id: str, email: str, role: str) -> str:
     return jwt.encode(payload, os.environ["JWT_SECRET"], algorithm=JWT_ALGORITHM)
 
 
-async def get_current_admin(request: Request) -> dict:
+def _decode_token(request: Request) -> dict:
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Not authenticated")
     token = auth_header[7:]
     try:
-        payload = jwt.decode(token, os.environ["JWT_SECRET"], algorithms=[JWT_ALGORITHM])
+        return jwt.decode(token, os.environ["JWT_SECRET"], algorithms=[JWT_ALGORITHM])
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
-    if payload.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
+
+
+async def get_current_user(request: Request) -> dict:
+    payload = _decode_token(request)
     user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     return user
+
+
+async def get_current_admin(request: Request) -> dict:
+    user = await get_current_user(request)
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+
+
+async def get_optional_user(request: Request) -> Optional[dict]:
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return None
+    try:
+        return await get_current_user(request)
+    except HTTPException:
+        return None
 
 
 # ========== Models ==========
@@ -91,11 +116,24 @@ class Product(BaseModel):
     badges: List[str] = []
     bestseller: bool = False
     stock: int = 25
+    engravable: bool = False
 
 
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
+
+
+class RegisterIn(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+    phone: Optional[str] = None
+
+
+class ProfileUpdateIn(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
 
 
 class NewsletterIn(BaseModel):
@@ -128,6 +166,7 @@ class OrderItem(BaseModel):
     price: int
     quantity: int
     image: str
+    engraving: Optional[str] = None
 
 
 class OrderIn(BaseModel):
@@ -142,114 +181,179 @@ class OrderIn(BaseModel):
     subtotal: int
     shipping: int
     total: int
+    redeemed_points: int = 0  # points used at checkout
 
 
-# ========== Sample Catalogue ==========
+# ========== Sample Catalogue (with multi-image) ==========
+ENGRAVABLE_CATEGORIES = {"lockets", "rings", "bracelets", "bridal"}
+
 SAMPLE_PRODUCTS: List[dict] = [
     {"id": "p-001", "slug": "classic-round-brilliant-stud", "name": "Classic Round Brilliant Stud",
      "category": "studs", "price": 3499, "carat_weight": "0.08ct",
-     "images": ["https://images.unsplash.com/photo-1617038220319-276d3cfab638?w=900&auto=format&fit=crop"],
+     "images": [
+         "https://images.unsplash.com/photo-1617038220319-276d3cfab638?w=1200&auto=format&fit=crop",
+         "https://images.unsplash.com/photo-1635767582909-345963b66a16?w=1200&auto=format&fit=crop",
+         "https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=1200&auto=format&fit=crop",
+     ],
      "description": "The one she never takes off. A certified natural VVS diamond set in solid 9ct gold — the most personal piece of fine jewellery.",
      "badges": ["VVS1", "E Colour", "Bestseller"], "bestseller": True},
     {"id": "p-002", "slug": "princess-cut-stud", "name": "Princess Cut Stud",
      "category": "studs", "price": 4299, "carat_weight": "0.10ct",
-     "images": ["https://images.unsplash.com/photo-1588444650700-6c46dc37bc91?w=900&auto=format&fit=crop"],
+     "images": [
+         "https://images.unsplash.com/photo-1588444650700-6c46dc37bc91?w=1200&auto=format&fit=crop",
+         "https://images.unsplash.com/photo-1617038260897-41a1f14a8ca0?w=1200&auto=format&fit=crop",
+     ],
      "description": "Sharp, modern, and unapologetic. Princess cut VVS diamonds in solid 9ct gold — the everyday stud, redefined.",
      "badges": ["VVS2", "F Colour", "IGI Certified"]},
     {"id": "p-003", "slug": "halo-diamond-stud", "name": "Halo Diamond Stud",
      "category": "studs", "price": 6799, "carat_weight": "0.15ct",
-     "images": ["https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=900&auto=format&fit=crop"],
+     "images": [
+         "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=1200&auto=format&fit=crop",
+         "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=1200&auto=format&fit=crop",
+     ],
      "description": "A central VVS diamond framed by a halo of smaller stones — brilliance amplified, crafted in solid 9ct gold.",
      "badges": ["VVS1", "E Colour", "GIA Certified", "New In"]},
     {"id": "p-101", "slug": "diamond-hoop", "name": "Diamond Hoop",
      "category": "earrings", "price": 8499, "carat_weight": "0.20ct total",
-     "images": ["https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=900&auto=format&fit=crop"],
+     "images": [
+         "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=1200&auto=format&fit=crop",
+         "https://images.unsplash.com/photo-1630019852942-f89202989a59?w=1200&auto=format&fit=crop",
+     ],
      "description": "The hoop she puts in once and never takes out. Pavé-set VVS diamonds along a solid 9ct gold curve.",
      "badges": ["VVS1", "E Colour", "Bestseller"], "bestseller": True},
     {"id": "p-102", "slug": "diamond-huggie", "name": "Diamond Huggie",
      "category": "earrings", "price": 5999, "carat_weight": "0.12ct total",
-     "images": ["https://images.unsplash.com/photo-1630019852942-f89202989a59?w=900&auto=format&fit=crop"],
+     "images": [
+         "https://images.unsplash.com/photo-1630019852942-f89202989a59?w=1200&auto=format&fit=crop",
+         "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=1200&auto=format&fit=crop",
+     ],
      "description": "Close-set. Clean. Considered. A row of VVS diamonds hugging the lobe in solid 9ct gold.",
      "badges": ["VVS2", "F Colour"]},
     {"id": "p-103", "slug": "diamond-drop", "name": "Diamond Drop",
      "category": "earrings", "price": 12499, "carat_weight": "0.30ct total",
-     "images": ["https://images.unsplash.com/photo-1630019852979-e8bfcb4b4a96?w=900&auto=format&fit=crop"],
+     "images": [
+         "https://images.unsplash.com/photo-1630019852979-e8bfcb4b4a96?w=1200&auto=format&fit=crop",
+         "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=1200&auto=format&fit=crop",
+     ],
      "description": "A thread of 9ct gold and VVS diamonds — movement, light, and a whisper of brilliance at the jawline.",
      "badges": ["VVS1", "E Colour", "GIA Certified"]},
     {"id": "p-201", "slug": "vvs-solitaire-ring", "name": "VVS Solitaire Ring",
      "category": "rings", "price": 24999, "carat_weight": "0.50ct",
-     "images": ["https://images.pexels.com/photos/30541177/pexels-photo-30541177.jpeg?auto=compress&cs=tinysrgb&w=900"],
+     "images": [
+         "https://images.pexels.com/photos/30541177/pexels-photo-30541177.jpeg?auto=compress&cs=tinysrgb&w=1200",
+         "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=1200&auto=format&fit=crop",
+         "https://images.unsplash.com/photo-1603561596112-db542a031cfa?w=1200&auto=format&fit=crop",
+     ],
      "description": "The one ring. Certified natural VVS1 diamond, E colour, set in a classic six-prong solid 9ct gold setting.",
      "badges": ["VVS1", "E Colour", "GIA Certified", "Bestseller"], "bestseller": True},
     {"id": "p-202", "slug": "diamond-eternity-band", "name": "Diamond Eternity Band",
      "category": "rings", "price": 18499, "carat_weight": "0.75ct total",
-     "images": ["https://images.unsplash.com/photo-1603561596112-db542a031cfa?w=900&auto=format&fit=crop"],
+     "images": [
+         "https://images.unsplash.com/photo-1603561596112-db542a031cfa?w=1200&auto=format&fit=crop",
+         "https://images.unsplash.com/photo-1606760227091-3dd870d97f1d?w=1200&auto=format&fit=crop",
+     ],
      "description": "A continuous circle of VVS diamonds with no beginning and no end. Solid 9ct gold. Named for what it means.",
      "badges": ["VVS2", "F Colour", "IGI Certified"]},
     {"id": "p-203", "slug": "stacking-band", "name": "Plain Gold Stacking Band",
      "category": "rings", "price": 5999,
-     "images": ["https://images.unsplash.com/photo-1598560917505-59a3ad559071?w=900&auto=format&fit=crop"],
+     "images": [
+         "https://images.unsplash.com/photo-1598560917505-59a3ad559071?w=1200&auto=format&fit=crop",
+         "https://images.unsplash.com/photo-1606760227091-3dd870d97f1d?w=1200&auto=format&fit=crop",
+     ],
      "description": "Wear one, wear three. A slim solid 9ct gold band designed to stack beautifully with every Cently ring.",
      "badges": ["BIS Hallmarked", "New In"]},
     {"id": "p-301", "slug": "solitaire-diamond-necklace", "name": "Solitaire Diamond Necklace",
      "category": "necklaces", "price": 9999, "carat_weight": "0.10ct",
-     "images": ["https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=900&auto=format&fit=crop"],
+     "images": [
+         "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=1200&auto=format&fit=crop",
+         "https://images.unsplash.com/photo-1573408301185-9146fe634ad0?w=1200&auto=format&fit=crop",
+     ],
      "description": "A single VVS diamond suspended on a fine solid 9ct gold chain. Everything. Nothing more.",
      "badges": ["VVS1", "E Colour", "Bestseller"], "bestseller": True},
     {"id": "p-302", "slug": "plain-gold-chain-necklace", "name": "Plain Gold Chain Necklace",
      "category": "necklaces", "price": 6499,
-     "images": ["https://images.unsplash.com/photo-1611652022419-a9419f74343d?w=900&auto=format&fit=crop"],
+     "images": [
+         "https://images.unsplash.com/photo-1611652022419-a9419f74343d?w=1200&auto=format&fit=crop",
+         "https://images.unsplash.com/photo-1573408301185-9146fe634ad0?w=1200&auto=format&fit=crop",
+     ],
      "description": "The chain she layers, loans, and never quite parts with. Solid 9ct gold, BIS Hallmarked. Made to outlast trends.",
      "badges": ["BIS Hallmarked"]},
     {"id": "p-303", "slug": "dainty-diamond-station", "name": "Dainty Diamond Station Necklace",
      "category": "necklaces", "price": 11999, "carat_weight": "0.25ct total",
-     "images": ["https://images.unsplash.com/photo-1573408301185-9146fe634ad0?w=900&auto=format&fit=crop"],
+     "images": [
+         "https://images.unsplash.com/photo-1573408301185-9146fe634ad0?w=1200&auto=format&fit=crop",
+         "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=1200&auto=format&fit=crop",
+     ],
      "description": "Small VVS diamonds punctuating a fine 9ct gold chain — a subtle glint across the collarbone.",
      "badges": ["VVS2", "F Colour", "New In"]},
     {"id": "p-401", "slug": "vvs-tennis-bracelet", "name": "VVS Diamond Tennis Bracelet",
      "category": "bracelets", "price": 38999, "carat_weight": "3.00ct total",
-     "images": ["https://images.unsplash.com/photo-1611085583191-a3b181a88401?w=900&auto=format&fit=crop"],
+     "images": [
+         "https://images.unsplash.com/photo-1611085583191-a3b181a88401?w=1200&auto=format&fit=crop",
+         "https://images.unsplash.com/photo-1606760227091-3dd870d97f1d?w=1200&auto=format&fit=crop",
+     ],
      "description": "The most considered wrist piece in fine jewellery. 3ct of VVS diamonds — one grade, one standard — in solid 9ct gold.",
      "badges": ["VVS1", "E Colour", "GIA Certified", "Bestseller"], "bestseller": True},
     {"id": "p-402", "slug": "gold-cuff", "name": "Solid Gold Cuff",
      "category": "bracelets", "price": 14999,
-     "images": ["https://images.unsplash.com/photo-1606760227091-3dd870d97f1d?w=900&auto=format&fit=crop"],
+     "images": [
+         "https://images.unsplash.com/photo-1606760227091-3dd870d97f1d?w=1200&auto=format&fit=crop",
+         "https://images.unsplash.com/photo-1611085583191-a3b181a88401?w=1200&auto=format&fit=crop",
+     ],
      "description": "Sculptural. Substantial. Solid 9ct gold at its most architectural — BIS Hallmarked, built to last generations.",
      "badges": ["BIS Hallmarked", "New In"]},
     {"id": "p-501", "slug": "classic-diamond-locket", "name": "Classic Diamond Locket",
      "category": "lockets", "price": 7999, "carat_weight": "0.08ct",
-     "images": ["https://images.unsplash.com/photo-1588444837495-c6cfeb53f32d?w=900&auto=format&fit=crop"],
+     "images": [
+         "https://images.unsplash.com/photo-1588444837495-c6cfeb53f32d?w=1200&auto=format&fit=crop",
+         "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=1200&auto=format&fit=crop",
+     ],
      "description": "The piece worn closest to the heart. A VVS diamond accent on a solid 9ct gold locket — engravable.",
      "badges": ["VVS2", "F Colour", "Engravable"]},
     {"id": "p-601", "slug": "bridal-engagement-ring", "name": "Bridal Engagement Ring",
      "category": "bridal", "price": 45999, "carat_weight": "1.00ct",
-     "images": ["https://images.unsplash.com/photo-1617038260897-41a1f14a8ca0?w=900&auto=format&fit=crop"],
+     "images": [
+         "https://images.unsplash.com/photo-1617038260897-41a1f14a8ca0?w=1200&auto=format&fit=crop",
+         "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=1200&auto=format&fit=crop",
+         "https://images.unsplash.com/photo-1603561596112-db542a031cfa?w=1200&auto=format&fit=crop",
+     ],
      "description": "The ring she says yes to — and yes to, every morning after. 1ct VVS1 solitaire, E colour, solid 9ct gold.",
      "badges": ["VVS1", "E Colour", "GIA Certified", "Bestseller"], "bestseller": True},
     {"id": "p-602", "slug": "modern-mangalsutra", "name": "The Modern Mangalsutra",
      "category": "bridal", "price": 28499, "carat_weight": "0.45ct total",
-     "images": ["https://images.unsplash.com/photo-1630019852895-5a3f39e6e6b5?w=900&auto=format&fit=crop"],
+     "images": [
+         "https://images.unsplash.com/photo-1630019852895-5a3f39e6e6b5?w=1200&auto=format&fit=crop",
+         "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=1200&auto=format&fit=crop",
+     ],
      "description": "Tradition, reimagined. Solid 9ct gold with VVS diamond accents — as fine as everything else she wears.",
      "badges": ["VVS2", "F Colour", "IGI Certified"]},
     {"id": "p-701", "slug": "diamond-nose-pin", "name": "Diamond Nose Pin",
      "category": "accessories", "price": 2499, "carat_weight": "0.05ct",
-     "images": ["https://images.unsplash.com/photo-1603974372039-adc49044b6bd?w=900&auto=format&fit=crop"],
+     "images": [
+         "https://images.unsplash.com/photo-1603974372039-adc49044b6bd?w=1200&auto=format&fit=crop",
+         "https://images.unsplash.com/photo-1615655406736-b37c4fabf923?w=1200&auto=format&fit=crop",
+     ],
      "description": "Small. Certified. Unapologetically real. A VVS diamond nose pin in solid 9ct gold — from ₹2,499.",
      "badges": ["VVS2", "F Colour"]},
     {"id": "p-702", "slug": "gold-anklet", "name": "Solid Gold Anklet",
      "category": "accessories", "price": 8999,
-     "images": ["https://images.unsplash.com/photo-1615655406736-b37c4fabf923?w=900&auto=format&fit=crop"],
+     "images": [
+         "https://images.unsplash.com/photo-1615655406736-b37c4fabf923?w=1200&auto=format&fit=crop",
+         "https://images.unsplash.com/photo-1606760227091-3dd870d97f1d?w=1200&auto=format&fit=crop",
+     ],
      "description": "A delicate solid 9ct gold anklet — BIS Hallmarked, weightless, and built to be worn every day.",
      "badges": ["BIS Hallmarked"]},
 ]
 
 
 async def seed_products():
-    if await db.products.count_documents({}) == 0:
-        for p in SAMPLE_PRODUCTS:
-            doc = Product(**p).model_dump()
-            await db.products.insert_one(doc)
-        logger.info(f"Seeded {len(SAMPLE_PRODUCTS)} products")
+    """Idempotent upsert — runs every startup, refreshes catalogue if data changes."""
+    for p in SAMPLE_PRODUCTS:
+        p_full = dict(p)
+        p_full["engravable"] = p_full.get("engravable") or p_full["category"] in ENGRAVABLE_CATEGORIES
+        doc = Product(**p_full).model_dump()
+        await db.products.update_one({"id": doc["id"]}, {"$set": doc}, upsert=True)
+    logger.info(f"Synced {len(SAMPLE_PRODUCTS)} products")
 
 
 async def seed_admin():
@@ -263,6 +367,7 @@ async def seed_admin():
             "password_hash": hash_password(admin_password),
             "name": "Cently Admin",
             "role": "admin",
+            "loyalty_points": 0,
             "created_at": now_iso(),
         })
         logger.info("Admin seeded")
@@ -340,21 +445,48 @@ async def book_consultation(payload: ConsultationIn):
 
 
 @api_router.post("/orders")
-async def create_order(payload: OrderIn):
+async def create_order(payload: OrderIn, request: Request):
+    """Creates an order. Optional auth: if customer logged in, awards loyalty points and applies redemption."""
+    user = await get_optional_user(request)
+
+    # Validate redemption
+    redeemed = max(0, int(payload.redeemed_points or 0))
+    if redeemed > 0:
+        if not user:
+            raise HTTPException(status_code=400, detail="Sign in to redeem Cently Circle points")
+        max_redeem_for_order = int(payload.subtotal * MAX_REDEEM_RATIO)
+        available = int(user.get("loyalty_points", 0))
+        if redeemed > min(available, max_redeem_for_order):
+            raise HTTPException(status_code=400, detail="Redeem amount exceeds limit")
+
     order_number = f"CNT-{uuid.uuid4().hex[:8].upper()}"
+    points_earned = int(payload.total * POINTS_PER_RUPEE)
+
     doc = payload.model_dump()
     doc["id"] = str(uuid.uuid4())
     doc["order_number"] = order_number
     doc["status"] = "pending_payment"
     doc["payment_provider"] = "razorpay_placeholder"
     doc["created_at"] = now_iso()
+    doc["customer_id"] = user["id"] if user else None
+    doc["points_earned"] = points_earned
+    doc["points_redeemed"] = redeemed
     await db.orders.insert_one(doc)
+
+    if user:
+        await db.users.update_one(
+            {"id": user["id"]},
+            {"$inc": {"loyalty_points": points_earned - redeemed}}
+        )
+
     return {
         "success": True,
         "order_number": order_number,
         "amount": payload.total,
         "currency": "INR",
         "razorpay_order_id": f"order_mock_{uuid.uuid4().hex[:12]}",
+        "points_earned": points_earned,
+        "points_redeemed": redeemed,
         "message": "Order created. Razorpay checkout would launch here.",
     }
 
@@ -382,26 +514,84 @@ async def list_journal():
 
 
 # ========== Auth Routes ==========
+def _public_user(u: dict) -> dict:
+    return {
+        "id": u["id"], "email": u["email"], "name": u.get("name"),
+        "role": u.get("role", "customer"), "phone": u.get("phone"),
+        "loyalty_points": int(u.get("loyalty_points", 0)),
+    }
+
+
+@api_router.post("/auth/register")
+async def register(payload: RegisterIn):
+    email = payload.email.lower()
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(status_code=409, detail="An account already exists with this email")
+    user = {
+        "id": str(uuid.uuid4()),
+        "email": email,
+        "password_hash": hash_password(payload.password),
+        "name": payload.name,
+        "phone": payload.phone,
+        "role": "customer",
+        "loyalty_points": 0,
+        "created_at": now_iso(),
+    }
+    await db.users.insert_one(user)
+    token = create_access_token(user["id"], email, "customer")
+    return {"access_token": token, "token_type": "bearer", "user": _public_user(user)}
+
+
 @api_router.post("/auth/login")
 async def login(payload: LoginIn):
     email = payload.email.lower()
     user = await db.users.find_one({"email": email})
     if not user or not verify_password(payload.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    token = create_access_token(user["id"], email, user.get("role", "admin"))
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "user": {"id": user["id"], "email": email, "name": user.get("name"), "role": user.get("role", "admin")},
-    }
+    token = create_access_token(user["id"], email, user.get("role", "customer"))
+    return {"access_token": token, "token_type": "bearer", "user": _public_user(user)}
 
 
 @api_router.get("/auth/me")
-async def get_me(current: dict = Depends(get_current_admin)):
-    return current
+async def get_me(current: dict = Depends(get_current_user)):
+    return _public_user(current)
 
 
-# ========== Admin Routes (protected) ==========
+# ========== Customer Account Routes ==========
+@account_router.get("/me")
+async def account_me(current: dict = Depends(get_current_user)):
+    return _public_user(current)
+
+
+@account_router.patch("/me")
+async def account_update(payload: ProfileUpdateIn, current: dict = Depends(get_current_user)):
+    update = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if update:
+        await db.users.update_one({"id": current["id"]}, {"$set": update})
+    refreshed = await db.users.find_one({"id": current["id"]}, {"_id": 0, "password_hash": 0})
+    return _public_user(refreshed)
+
+
+@account_router.get("/orders")
+async def account_orders(current: dict = Depends(get_current_user)):
+    docs = await db.orders.find(
+        {"customer_id": current["id"]}, {"_id": 0}
+    ).sort("created_at", -1).to_list(200)
+    return docs
+
+
+@account_router.get("/loyalty")
+async def account_loyalty(current: dict = Depends(get_current_user)):
+    points = int(current.get("loyalty_points", 0))
+    return {
+        "points": points,
+        "value_inr": points * POINT_VALUE,
+        "max_redeem_ratio": MAX_REDEEM_RATIO,
+        "earn_rate": "1 point per ₹100 spent",
+    }
+
+
+# ========== Admin Routes ==========
 @admin_router.get("/stats")
 async def admin_stats(current: dict = Depends(get_current_admin)):
     return {
@@ -410,6 +600,7 @@ async def admin_stats(current: dict = Depends(get_current_admin)):
         "newsletter_subscribers": await db.newsletter.count_documents({}),
         "contact_messages": await db.contact_messages.count_documents({}),
         "consultations": await db.consultations.count_documents({}),
+        "customers": await db.users.count_documents({"role": "customer"}),
     }
 
 
@@ -443,8 +634,18 @@ async def admin_products(current: dict = Depends(get_current_admin)):
     return docs
 
 
+@admin_router.get("/customers")
+async def admin_customers(current: dict = Depends(get_current_admin)):
+    docs = await db.users.find(
+        {"role": "customer"},
+        {"_id": 0, "password_hash": 0}
+    ).sort("created_at", -1).to_list(1000)
+    return docs
+
+
 app.include_router(api_router)
 app.include_router(admin_router)
+app.include_router(account_router)
 
 app.add_middleware(
     CORSMiddleware,

@@ -1,0 +1,45 @@
+{
+  "summary": "Iteration 2 e2e testing of CENTLY P2 features (customer auth + loyalty + engraving + multi-image gallery). Backend pytest: 46/46 passed (28 iter1 regression + 18 new iter2 cases) covering register/login, /api/account/* (me, profile update, orders, loyalty), guest vs authed orders, loyalty earn (1 pt per ₹100), redeem caps (>available 400, >10% subtotal 400, redeem-without-auth 400), point decrement integrity, account-orders isolation, multi-image (>=2 per product) and engravable flag for lockets/rings/bracelets/bridal. Frontend Playwright: /login + /register tab switching, registration → /account redirect, /account/circle (Bronze tier), profile name/phone update, multi-image thumbnail switch on product page, engraving toggle + textarea + visibility in cart drawer, redeem-block correctly hidden when 0 pts and shown after order with slider max=79 (₹7,999 order → 79 pts), points reflect on /account/circle after refresh, header user-icon → /login when guest and → /account when signed in, sign-out flow. Razorpay still mocked as expected.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Header (signed-in)", "issues": ["Gold dot indicator next to user icon is implemented but uses inline class — not strictly a bug; consider adding data-testid='user-status-dot' for stable automation."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_cently_iter2.py",
+    "/app/backend/tests/test_cently_backend.py",
+    "/app/test_reports/pytest/pytest_results.xml",
+    "/app/test_reports/pytest/iter2_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Add data-testid attributes to header cart-toggle and user-status-dot for deterministic future automation.",
+    "(Optional) AuthContext.login currently always stores token under cently_customer_token even when an admin signs in via /login — works but blurs separation; consider routing admin to admin-token path.",
+    "(Optional) Tighten CORS allow_origins to explicit production origins before launch (currently '*' from env default)."
+  ],
+  "critical_code_review_comments": [
+    "server.py POST /api/orders correctly enforces redeem cap = min(available, subtotal*0.10) and 400s on guest-redeem — verified in tests.",
+    "Loyalty points net update is +earned − redeemed via $inc — atomic and idempotent per order; verified before/after points in test_redeem_decrements_points_correctly.",
+    "Account routes properly require auth (401 when no bearer) and user is scoped via JWT sub; account/orders filters on customer_id — isolation verified across two customers.",
+    "seed_products() uses upsert keyed on id — adding new fields like engravable / multi-image arrays propagates to existing DB rows without manual migration. Good idempotency.",
+    "ENGRAVABLE_CATEGORIES applied at seed time; engravable flag on response confirmed for lockets/rings/bracelets/bridal — verified.",
+    "_id is excluded in every find/find_one projection — no Mongo ObjectId leakage.",
+    "Frontend api.js interceptor cleanly separates cently_customer_token (account/* + auth/me + orders) from cently_admin_token (admin/*) — separation works.",
+    "Razorpay continues to be a mock placeholder and is documented; both backend response (razorpay_order_id='order_mock_*') and frontend Checkout copy disclose this."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_cently_iter2.py (new — 18 pytest tests for iter2 features)"
+  ],
+  "success_rate": {"backend": "100% (46/46)", "frontend": "100% of critical iter2 flows"},
+  "test_credentials": "Admin: admin@cently.com / Cently@2026 (verified). Customers registered dynamically with TEST_cust_*@example.com / Pass@1234.",
+  "seed_data_creation": "Iter2 tests created multiple TEST_ customers, ~5 orders, and exercised loyalty point increments/decrements. No manual cleanup performed (TEST_-prefixed only).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression: run `pytest /app/backend/tests/ -v --junitxml=/app/test_reports/pytest/pytest_results.xml` (46 tests). Iter2-specific tests live in test_cently_iter2.py. Loyalty rules: 1 pt/₹100, 1 pt = ₹1, max 10% redeem. Customer auth uses cently_customer_token in localStorage (separate from admin token). Engravable categories: lockets, rings, bracelets, bridal. Engraving propagates from Product page → cart (lineKey separation) → checkout summary → order item.engraving on backend. Razorpay mocked — order_number CNT-* + razorpay_order_id order_mock_*.",
+  "rca of the issue": "N/A — no failing tests in iter2."
+}

@@ -26,6 +26,11 @@ import Sustainability from "@/pages/Sustainability";
 import Care from "@/pages/Care";
 import Legal from "@/pages/Legal";
 
+import AccountAuth from "@/pages/AccountAuth";
+import {
+  AccountLayout, AccountOverview, AccountOrders, AccountProfile, AccountCircle,
+} from "@/pages/Account";
+
 import AdminLogin from "@/pages/AdminLogin";
 import AdminDashboard, {
   AdminLayout, AdminOrders, AdminProducts,
@@ -33,6 +38,7 @@ import AdminDashboard, {
 } from "@/pages/Admin";
 
 import { StoreProvider } from "@/context/StoreContext";
+import { AuthProvider } from "@/context/AuthContext";
 
 function ScrollTop() {
   const { pathname } = useLocation();
@@ -85,6 +91,17 @@ function StorefrontRoutes() {
         <Route path="/care" element={<Care />} />
         <Route path="/careers" element={<Contact />} />
         <Route path="/legal/:slug" element={<Legal />} />
+
+        {/* Customer auth + account */}
+        <Route path="/login" element={<AccountAuth />} />
+        <Route path="/register" element={<AccountAuth />} />
+        <Route path="/account" element={<AccountLayout />}>
+          <Route index element={<AccountOverview />} />
+          <Route path="orders" element={<AccountOrders />} />
+          <Route path="profile" element={<AccountProfile />} />
+          <Route path="circle" element={<AccountCircle />} />
+        </Route>
+
         <Route path="*" element={<NotFound />} />
       </Routes>
     </StorefrontShell>
@@ -94,24 +111,26 @@ function StorefrontRoutes() {
 function App() {
   return (
     <div className="App">
-      <StoreProvider>
-        <BrowserRouter>
-          <ScrollTop />
-          <Toaster position="top-right" richColors closeButton />
-          <Routes>
-            <Route path="/admin/login" element={<AdminLogin />} />
-            <Route path="/admin" element={<AdminLayout />}>
-              <Route index element={<AdminDashboard />} />
-              <Route path="orders" element={<AdminOrders />} />
-              <Route path="products" element={<AdminProducts />} />
-              <Route path="newsletter" element={<AdminNewsletter />} />
-              <Route path="contact" element={<AdminContact />} />
-              <Route path="consultations" element={<AdminConsultations />} />
-            </Route>
-            <Route path="*" element={<StorefrontRoutes />} />
-          </Routes>
-        </BrowserRouter>
-      </StoreProvider>
+      <AuthProvider>
+        <StoreProvider>
+          <BrowserRouter>
+            <ScrollTop />
+            <Toaster position="top-right" richColors closeButton />
+            <Routes>
+              <Route path="/admin/login" element={<AdminLogin />} />
+              <Route path="/admin" element={<AdminLayout />}>
+                <Route index element={<AdminDashboard />} />
+                <Route path="orders" element={<AdminOrders />} />
+                <Route path="products" element={<AdminProducts />} />
+                <Route path="newsletter" element={<AdminNewsletter />} />
+                <Route path="contact" element={<AdminContact />} />
+                <Route path="consultations" element={<AdminConsultations />} />
+              </Route>
+              <Route path="*" element={<StorefrontRoutes />} />
+            </Routes>
+          </BrowserRouter>
+        </StoreProvider>
+      </AuthProvider>
     </div>
   );
 }
