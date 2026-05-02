@@ -27,6 +27,18 @@ User additionally requested an **admin panel with login credentials**.
 - Admin: secure login + read-only dashboards
 
 ## Implemented (Feb 2026)
+### Iteration 1 — MVP (Feb 2026)
+- Storefront, admin panel, mock checkout (see below)
+
+### Iteration 2 — Customer auth + Loyalty + Engraving + Gallery (Feb 2026)
+- **Customer auth**: register / login / `/api/account/me` (GET + PATCH) / `/api/account/orders` / `/api/account/loyalty`
+- **My Account**: `/account` overview, `/account/orders` with full order detail (items, engraving, points), `/account/profile`, `/account/circle`
+- **Cently Circle loyalty**: 1 pt per ₹100 spent, 1 pt = ₹1, max 10% redemption per order. Tiers: Bronze (0–249) · Silver (250–999) · Gold (1000+). Atomic `$inc` on order placement.
+- **Engraving**: Auto-enabled for `lockets`, `rings`, `bracelets`, `bridal` categories. Toggle + 20-char input on product page → carries through cart `lineKey` → checkout → `OrderItem.engraving`
+- **Multi-image gallery**: 2–3 images per product; thumbnail strip with active state on product page
+- **Header**: User icon with auth-state aware link (`/login` or `/account`) + gold dot indicator when signed in
+- **Test coverage**: 46/46 pytest cases ✅ (28 regression + 18 iter2)
+
 ### Backend (`/app/backend/server.py`)
 - 19 seeded products across 8 categories
 - Public endpoints: `GET /api/products` (filters: category, bestseller), `GET /api/products/{slug}`, `GET /api/categories`, `GET /api/journal`
@@ -53,24 +65,24 @@ User additionally requested an **admin panel with login credentials**.
 - Stored in `/app/memory/test_credentials.md`
 
 ## Backlog (P0 → P2)
-**P0 — none** (MVP fully functional)
+**P0 — none** (storefront + customer area + admin all functional)
 
 **P1**
 - Real Razorpay key integration (replace mock — playbook code already in place at `POST /api/orders` and `Checkout.jsx`)
 - Admin: order status edit (`pending_payment` → `paid` → `dispatched` → `delivered`)
-- Customer email notifications (Resend/SendGrid) for order confirmation, dispatch, welcome
+- Customer email notifications (Resend/SendGrid) for order confirmation, dispatch, welcome, points-earned receipt
 - Admin: product CRUD UI (currently read-only; products are seeded)
 
-**P2**
-- Customer auth + order history + saved addresses
-- Engraving / personalisation flow on Lockets, Rings, Bracelets
-- Image gallery on product detail (currently single image)
-- Filtering and faceted search on collection pages
-- Razorpay webhook + idempotent payment confirmation
-- Internationalisation (multi-currency)
-- Sitemap + structured data (Product, Organization, FAQ schemas) for SEO
-- Bridal lookbook / shoppable editorial pages
-- Referral programme + Cently Circle (loyalty)
+**P2 — remaining (Batch B for next iteration)**
+- Faceted search (price, metal colour, gem badge, in-stock filters on Collection pages + global search)
+- SEO structured data (Product, Organization, FAQ, BreadcrumbList JSON-LD + meta tags)
+- Internationalisation (multi-currency: INR / USD / GBP / AED + i18n EN-default scaffolding)
+
+**P2 — done (Batch A, this iteration)**
+- ✅ Customer auth + order history
+- ✅ Engraving / personalisation flow
+- ✅ Multi-image product gallery
+- ✅ Cently Circle loyalty
 
 ## Notes for next agent
 - Razorpay flow is **mocked**: `POST /api/orders` returns `razorpay_order_id: "order_mock_*"`. To wire it up, replace the placeholder in `server.py:create_order` with `razorpay.Client(...).order.create(...)` and in `Checkout.jsx:placeOrder` open `window.Razorpay({key, order_id, ...}).open()` before navigating to confirmation.
