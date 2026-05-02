@@ -62,10 +62,12 @@ export default function AdminLogin() {
             </button>
           </form>
         </div>
-        <p className="mt-6 text-xs text-center text-[#FAF9F5]/50 leading-relaxed">
-          Default credentials are seeded from <code className="text-[#D4B882]">backend/.env</code>.<br />
-          Stored in <code className="text-[#D4B882]">/app/memory/test_credentials.md</code>.
-        </p>
+        {process.env.NODE_ENV !== "production" && (
+          <p className="mt-6 text-xs text-center text-[#FAF9F5]/50 leading-relaxed">
+            Default credentials are seeded from <code className="text-[#D4B882]">backend/.env</code>.<br />
+            Stored in <code className="text-[#D4B882]">/app/memory/test_credentials.md</code>.
+          </p>
+        )}
       </div>
     </div>
   );

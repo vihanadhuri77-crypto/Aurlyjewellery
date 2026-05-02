@@ -45,7 +45,7 @@ export default function Home() {
           initial="hidden" animate="show" variants={fadeUp}
           className="relative z-10 max-w-[1600px] mx-auto px-6 md:px-12 pb-20 md:pb-28 text-[#FAF9F5]"
         >
-          <p className="overline text-[#D4B882] mb-6">Real diamonds. Real gold. Every day.</p>
+          <p className="overline text-[#D4B882] mb-6 [text-shadow:_0_1px_8px_rgba(0,0,0,0.45)]">Real diamonds. Real gold. Every day.</p>
           <h1 className="font-serif-display text-5xl md:text-7xl lg:text-[110px] font-light leading-[0.92] tracking-tight max-w-5xl">
             Wear It Every Day.<br/>
             <span className="italic font-light">Not Just Someday.</span>
